@@ -13,14 +13,15 @@ import weakref
 class Prior(object):
     domain = None
     _instance = None
+
     def __new__(cls, *args, **kwargs):
         if not cls._instance or cls._instance.__class__ is not cls:
-                newfunc = super(Prior, cls).__new__
-                if newfunc is object.__new__:
-                    cls._instance = newfunc(cls)
-                else:
-                    cls._instance = newfunc(cls, *args, **kwargs)
-                return cls._instance
+            newfunc = super(Prior, cls).__new__
+            if newfunc is object.__new__:
+                cls._instance = newfunc(cls)
+            else:
+                cls._instance = newfunc(cls, *args, **kwargs)
+            return cls._instance
 
     def pdf(self, x):
         return np.exp(self.lnpdf(x))
@@ -47,6 +48,7 @@ class Gaussian(Prior):
     .. Note:: Bishop 2006 notation is used throughout the code
 
     """
+
     domain = _REAL
     _instances = []
 
@@ -82,6 +84,7 @@ class Gaussian(Prior):
     def rvs(self, n):
         return np.random.randn(n) * self.sigma + self.mu
 
+
 #     def __getstate__(self):
 #         return self.mu, self.sigma
 #
@@ -90,6 +93,7 @@ class Gaussian(Prior):
 #         self.sigma = state[1]
 #         self.sigma2 = np.square(self.sigma)
 #         self.constant = -0.5 * np.log(2 * np.pi * self.sigma2)
+
 
 class Uniform(Prior):
     _instances = []
@@ -132,12 +136,14 @@ class Uniform(Prior):
     def rvs(self, n):
         return np.random.uniform(self.lower, self.upper, size=n)
 
+
 #     def __getstate__(self):
 #         return self.lower, self.upper
 #
 #     def __setstate__(self, state):
 #         self.lower = state[0]
 #         self.upper = state[1]
+
 
 class LogGaussian(Gaussian):
     """
@@ -149,6 +155,7 @@ class LogGaussian(Gaussian):
     .. Note:: Bishop 2006 notation is used throughout the code
 
     """
+
     domain = _POSITIVE
     _instances = []
 
@@ -160,7 +167,7 @@ class LogGaussian(Gaussian):
                     return instance()
         newfunc = super(Prior, cls).__new__
         if newfunc is object.__new__:
-            o = newfunc(cls)  
+            o = newfunc(cls)
         else:
             o = newfunc(cls, mu, sigma)
         cls._instances.append(weakref.ref(o))
@@ -179,7 +186,7 @@ class LogGaussian(Gaussian):
         return self.constant - 0.5 * np.square(np.log(x) - self.mu) / self.sigma2 - np.log(x)
 
     def lnpdf_grad(self, x):
-        return -((np.log(x) - self.mu) / self.sigma2 + 1.) / x
+        return -((np.log(x) - self.mu) / self.sigma2 + 1.0) / x
 
     def rvs(self, n):
         return np.exp(np.random.randn(int(n)) * self.sigma + self.mu)
@@ -195,16 +202,15 @@ class MultivariateGaussian(Prior):
     .. Note:: Bishop 2006 notation is used throughout the code
 
     """
+
     domain = _REAL
     _instances = []
 
     def __new__(cls, mu=0, var=1):  # Singleton:
         if cls._instances:
-            cls._instances[:] = [instance for instance in cls._instances if
-                                 instance()]
+            cls._instances[:] = [instance for instance in cls._instances if instance()]
             for instance in cls._instances:
-                if np.all(instance().mu == mu) and np.all(
-                        instance().var == var):
+                if np.all(instance().mu == mu) and np.all(instance().var == var):
                     return instance()
         newfunc = super(Prior, cls).__new__
         if newfunc is object.__new__:
@@ -218,8 +224,7 @@ class MultivariateGaussian(Prior):
         self.mu = np.array(mu).flatten()
         self.var = np.array(var)
         assert len(self.var.shape) == 2, 'Covariance must be a matrix'
-        assert self.var.shape[0] == self.var.shape[1], \
-            'Covariance must be a square matrix'
+        assert self.var.shape[0] == self.var.shape[1], 'Covariance must be a square matrix'
         assert self.var.shape[0] == self.mu.size
         self.input_dim = self.mu.size
         self.inv, _, self.hld, _ = pdinv(self.var)
@@ -243,7 +248,7 @@ class MultivariateGaussian(Prior):
     def lnpdf_grad(self, x):
         x = np.array(x).flatten()
         d = x - self.mu
-        return - np.dot(self.inv, d)
+        return -np.dot(self.inv, d)
 
     def rvs(self, n):
         return np.random.multivariate_normal(self.mu, self.var, n)
@@ -263,12 +268,12 @@ class MultivariateGaussian(Prior):
         self.mu = np.array(state[0]).flatten()
         self.var = state[1]
         assert len(self.var.shape) == 2, 'Covariance must be a matrix'
-        assert self.var.shape[0] == self.var.shape[1], \
-            'Covariance must be a square matrix'
+        assert self.var.shape[0] == self.var.shape[1], 'Covariance must be a square matrix'
         assert self.var.shape[0] == self.mu.size
         self.input_dim = self.mu.size
         self.inv, _, self.hld, _ = pdinv(self.var)
         self.constant = -0.5 * (self.input_dim * np.log(2 * np.pi) + self.hld)
+
 
 def gamma_from_EV(E, V):
     warnings.warn("use Gamma.from_EV to create Gamma Prior", FutureWarning)
@@ -285,10 +290,11 @@ class Gamma(Prior):
     .. Note:: Bishop 2006 notation is used throughout the code
 
     """
+
     domain = _POSITIVE
     _instances = []
 
-    def __new__(cls, a=1, b=.5):  # Singleton:
+    def __new__(cls, a=1, b=0.5):  # Singleton:
         if cls._instances:
             cls._instances[:] = [instance for instance in cls._instances if instance()]
             for instance in cls._instances:
@@ -319,12 +325,14 @@ class Gamma(Prior):
         return "Ga({:.2g}, {:.2g})".format(self.a, self.b)
 
     def summary(self):
-        ret = {"E[x]": self.a / self.b, \
-               "E[ln x]": digamma(self.a) - np.log(self.b), \
-               "var[x]": self.a / self.b / self.b, \
-               "Entropy": gammaln(self.a) - (self.a - 1.) * digamma(self.a) - np.log(self.b) + self.a}
+        ret = {
+            "E[x]": self.a / self.b,
+            "E[ln x]": digamma(self.a) - np.log(self.b),
+            "var[x]": self.a / self.b / self.b,
+            "Entropy": gammaln(self.a) - (self.a - 1.0) * digamma(self.a) - np.log(self.b) + self.a,
+        }
         if self.a > 1:
-            ret['Mode'] = (self.a - 1.) / self.b
+            ret['Mode'] = (self.a - 1.0) / self.b
         else:
             ret['mode'] = np.nan
         return ret
@@ -333,10 +341,10 @@ class Gamma(Prior):
         return self.constant + (self.a - 1) * np.log(x) - self.b * x
 
     def lnpdf_grad(self, x):
-        return (self.a - 1.) / x - self.b
+        return (self.a - 1.0) / x - self.b
 
     def rvs(self, n):
-        return np.random.gamma(scale=1. / self.b, shape=self.a, size=n)
+        return np.random.gamma(scale=1.0 / self.b, shape=self.a, size=n)
 
     @staticmethod
     def from_EV(E, V):
@@ -359,6 +367,7 @@ class Gamma(Prior):
         self._b = state[1]
         self.constant = -gammaln(self.a) + self.a * np.log(self.b)
 
+
 class InverseGamma(Gamma):
     """
     Implementation of the inverse-Gamma probability function, coupled with random variables.
@@ -369,6 +378,7 @@ class InverseGamma(Gamma):
     .. Note:: Bishop 2006 notation is used throughout the code
 
     """
+
     domain = _POSITIVE
     _instances = []
 
@@ -386,10 +396,11 @@ class InverseGamma(Gamma):
         return self.constant - (self.a + 1) * np.log(x) - self.b / x
 
     def lnpdf_grad(self, x):
-        return -(self.a + 1.) / x + self.b / x ** 2
+        return -(self.a + 1.0) / x + self.b / x**2
 
     def rvs(self, n):
-        return 1. / np.random.gamma(scale=1. / self.b, shape=self.a, size=n)
+        return 1.0 / np.random.gamma(scale=1.0 / self.b, shape=self.a, size=n)
+
 
 class DGPLVM_KFDA(Prior):
     """
@@ -403,6 +414,7 @@ class DGPLVM_KFDA(Prior):
     .. Note:: Surpassing Human-Level Face paper dgplvm implementation
 
     """
+
     domain = _REAL
     # _instances = []
     # def __new__(cls, lambdaa, sigma2):  # Singleton:
@@ -459,8 +471,8 @@ class DGPLVM_KFDA(Prior):
         lst_ni = []
         lst_ni1 = []
         lst_ni2 = []
-        f1 = (np.where(self.lbl[:, 0] == 1)[0])
-        f2 = (np.where(self.lbl[:, 1] == 1)[0])
+        f1 = np.where(self.lbl[:, 0] == 1)[0]
+        f2 = np.where(self.lbl[:, 1] == 1)[0]
         for idx in f1:
             lst_ni1.append(idx)
         for idx in f2:
@@ -474,11 +486,11 @@ class DGPLVM_KFDA(Prior):
         count = 0
         for N_i in lst_ni:
             if N_i == lst_ni[0]:
-                a[count:count + N_i] = (float(1) / N_i) * a[count]
+                a[count : count + N_i] = (float(1) / N_i) * a[count]
                 count += N_i
             else:
                 if N_i == lst_ni[1]:
-                    a[count: count + N_i] = -(float(1) / N_i) * a[count]
+                    a[count : count + N_i] = -(float(1) / N_i) * a[count]
                     count += N_i
         return a
 
@@ -487,7 +499,7 @@ class DGPLVM_KFDA(Prior):
         idx = 0
         for N_i in lst_ni:
             B = float(1) / np.sqrt(N_i) * (np.eye(N_i) - ((float(1) / N_i) * np.ones((N_i, N_i))))
-            A[idx:idx + N_i, idx:idx + N_i] = B
+            A[idx : idx + N_i, idx : idx + N_i] = B
             idx += N_i
         return A
 
@@ -498,9 +510,11 @@ class DGPLVM_KFDA(Prior):
         a_trans = np.transpose(self.a)
         paran = self.lambdaa * np.eye(x.shape[0]) + self.A.dot(K).dot(self.A)
         inv_part = pdinv(paran)[0]
-        J = a_trans.dot(K).dot(self.a) - a_trans.dot(K).dot(self.A).dot(inv_part).dot(self.A).dot(K).dot(self.a)
-        J_star = (1. / self.lambdaa) * J
-        return (-1. / self.sigma2) * J_star
+        J = a_trans.dot(K).dot(self.a) - a_trans.dot(K).dot(self.A).dot(inv_part).dot(self.A).dot(
+            K
+        ).dot(self.a)
+        J_star = (1.0 / self.lambdaa) * J
+        return (-1.0 / self.sigma2) * J_star
 
     # Here gradient function
     def lnpdf_grad(self, x):
@@ -511,9 +525,9 @@ class DGPLVM_KFDA(Prior):
         b = self.A.dot(inv_part).dot(self.A).dot(K).dot(self.a)
         a_Minus_b = self.a - b
         a_b_trans = np.transpose(a_Minus_b)
-        DJ_star_DK = (1. / self.lambdaa) * (a_Minus_b.dot(a_b_trans))
+        DJ_star_DK = (1.0 / self.lambdaa) * (a_Minus_b.dot(a_b_trans))
         DJ_star_DX = self.kern.gradients_X(DJ_star_DK, x)
-        return (-1. / self.sigma2) * DJ_star_DX
+        return (-1.0 / self.sigma2) * DJ_star_DX
 
     def rvs(self, n):
         return np.random.rand(n)  # A WRONG implementation
@@ -547,6 +561,7 @@ class DGPLVM(Prior):
     .. Note:: DGPLVM for Classification paper implementation
 
     """
+
     domain = _REAL
 
     def __new__(cls, sigma2, lbl, x_shape):
@@ -606,7 +621,7 @@ class DGPLVM(Prior):
         for i in data_idx:
             if len(lst_idx) == 0:
                 pass
-                #Do nothing, because it is the first time list is created so is empty
+                # Do nothing, because it is the first time list is created so is empty
             else:
                 lst_idx = []
             # Here we put indices of each class in to the list called lst_idx_all
@@ -631,9 +646,9 @@ class DGPLVM(Prior):
             N_i = float(len(cls[i]))
             W_WT = np.zeros((self.dim, self.dim))
             for xk in cls[i]:
-                W = (xk - M_i[i])
+                W = xk - M_i[i]
                 W_WT += np.outer(W, W)
-            Sw += (N_i / self.datanum) * ((1. / N_i) * W_WT)
+            Sw += (N_i / self.datanum) * ((1.0 / N_i) * W_WT)
         return Sw
 
     # Calculating beta and Bi for Sb
@@ -658,7 +673,6 @@ class DGPLVM(Prior):
         Sig_beta_B_i_all = Sig_beta_B_i_all.transpose()
         return Sig_beta_B_i_all
 
-
     # Calculating W_j s separately so we can access all the W_j s anytime
     def compute_wj(self, data_idx, M_i):
         W_i = np.zeros((self.datanum, self.dim))
@@ -667,7 +681,7 @@ class DGPLVM(Prior):
             for tpl in data_idx[i]:
                 xj = tpl[1]
                 j = tpl[0]
-                W_i[j] = (xj - M_i[i])
+                W_i[j] = xj - M_i[i]
         return W_i
 
     # Calculating alpha and Wj for Sw
@@ -680,11 +694,11 @@ class DGPLVM(Prior):
                 for j in lst_idx_all[i]:
                     if k == j:
                         alpha = 1 - (float(1) / N_i)
-                        Sig_alpha_W_i[k] += (alpha * W_i[j])
+                        Sig_alpha_W_i[k] += alpha * W_i[j]
                     else:
                         alpha = 0 - (float(1) / N_i)
-                        Sig_alpha_W_i[k] += (alpha * W_i[j])
-        Sig_alpha_W_i = (1. / self.datanum) * np.transpose(Sig_alpha_W_i)
+                        Sig_alpha_W_i[k] += alpha * W_i[j]
+        Sig_alpha_W_i = (1.0 / self.datanum) * np.transpose(Sig_alpha_W_i)
         return Sig_alpha_W_i
 
     # This function calculates log of our prior
@@ -696,9 +710,9 @@ class DGPLVM(Prior):
         Sb = self.compute_Sb(cls, M_i, M_0)
         Sw = self.compute_Sw(cls, M_i)
         # sb_N = np.linalg.inv(Sb + np.eye(Sb.shape[0]) * (np.diag(Sb).min() * 0.1))
-        #Sb_inv_N = np.linalg.inv(Sb+np.eye(Sb.shape[0])*0.1)
-        #Sb_inv_N = pdinv(Sb+ np.eye(Sb.shape[0]) * (np.diag(Sb).min() * 0.1))[0]
-        Sb_inv_N = pdinv(Sb + np.eye(Sb.shape[0])*0.1)[0]
+        # Sb_inv_N = np.linalg.inv(Sb+np.eye(Sb.shape[0])*0.1)
+        # Sb_inv_N = pdinv(Sb+ np.eye(Sb.shape[0]) * (np.diag(Sb).min() * 0.1))[0]
+        Sb_inv_N = pdinv(Sb + np.eye(Sb.shape[0]) * 0.1)[0]
         return (-1 / self.sigma2) * np.trace(Sb_inv_N.dot(Sw))
 
     # This function calculates derivative of the log of prior function
@@ -717,19 +731,20 @@ class DGPLVM(Prior):
 
         # Calculating inverse of Sb and its transpose and minus
         # Sb_inv_N = np.linalg.inv(Sb + np.eye(Sb.shape[0]) * (np.diag(Sb).min() * 0.1))
-        #Sb_inv_N = np.linalg.inv(Sb+np.eye(Sb.shape[0])*0.1)
-        #Sb_inv_N = pdinv(Sb+ np.eye(Sb.shape[0]) * (np.diag(Sb).min() * 0.1))[0]
-        Sb_inv_N = pdinv(Sb + np.eye(Sb.shape[0])*0.1)[0]
+        # Sb_inv_N = np.linalg.inv(Sb+np.eye(Sb.shape[0])*0.1)
+        # Sb_inv_N = pdinv(Sb+ np.eye(Sb.shape[0]) * (np.diag(Sb).min() * 0.1))[0]
+        Sb_inv_N = pdinv(Sb + np.eye(Sb.shape[0]) * 0.1)[0]
         Sb_inv_N_trans = np.transpose(Sb_inv_N)
         Sb_inv_N_trans_minus = -1 * Sb_inv_N_trans
         Sw_trans = np.transpose(Sw)
 
         # Calculating DJ/DXk
         DJ_Dxk = 2 * (
-            Sb_inv_N_trans_minus.dot(Sw_trans).dot(Sb_inv_N_trans).dot(Sig_beta_B_i_all) + Sb_inv_N_trans.dot(
-                Sig_alpha_W_i))
+            Sb_inv_N_trans_minus.dot(Sw_trans).dot(Sb_inv_N_trans).dot(Sig_beta_B_i_all)
+            + Sb_inv_N_trans.dot(Sig_alpha_W_i)
+        )
         # Calculating derivative of the log of the prior
-        DPx_Dx = ((-1 / self.sigma2) * DJ_Dxk)
+        DPx_Dx = (-1 / self.sigma2) * DJ_Dxk
         return DPx_Dx.T
 
     # def frb(self, x):
@@ -752,6 +767,7 @@ class DGPLVM(Prior):
 from . import Parameterized
 from . import Param
 
+
 class DGPLVM_Lamda(Prior, Parameterized):
     """
     Implementation of the Discriminative Gaussian Process Latent Variable model paper, by Raquel.
@@ -761,6 +777,7 @@ class DGPLVM_Lamda(Prior, Parameterized):
     .. Note:: DGPLVM for Classification paper implementation
 
     """
+
     domain = _REAL
     # _instances = []
     # def __new__(cls, mu, sigma): # Singleton:
@@ -831,7 +848,7 @@ class DGPLVM_Lamda(Prior, Parameterized):
         for i in data_idx:
             if len(lst_idx) == 0:
                 pass
-                #Do nothing, because it is the first time list is created so is empty
+                # Do nothing, because it is the first time list is created so is empty
             else:
                 lst_idx = []
             # Here we put indices of each class in to the list called lst_idx_all
@@ -856,9 +873,9 @@ class DGPLVM_Lamda(Prior, Parameterized):
             N_i = float(len(cls[i]))
             W_WT = np.zeros((self.dim, self.dim))
             for xk in cls[i]:
-                W = (xk - M_i[i])
+                W = xk - M_i[i]
                 W_WT += np.outer(W, W)
-            Sw += (N_i / self.datanum) * ((1. / N_i) * W_WT)
+            Sw += (N_i / self.datanum) * ((1.0 / N_i) * W_WT)
         return Sw
 
     # Calculating beta and Bi for Sb
@@ -883,7 +900,6 @@ class DGPLVM_Lamda(Prior, Parameterized):
         Sig_beta_B_i_all = Sig_beta_B_i_all.transpose()
         return Sig_beta_B_i_all
 
-
     # Calculating W_j s separately so we can access all the W_j s anytime
     def compute_wj(self, data_idx, M_i):
         W_i = np.zeros((self.datanum, self.dim))
@@ -892,7 +908,7 @@ class DGPLVM_Lamda(Prior, Parameterized):
             for tpl in data_idx[i]:
                 xj = tpl[1]
                 j = tpl[0]
-                W_i[j] = (xj - M_i[i])
+                W_i[j] = xj - M_i[i]
         return W_i
 
     # Calculating alpha and Wj for Sw
@@ -905,11 +921,11 @@ class DGPLVM_Lamda(Prior, Parameterized):
                 for j in lst_idx_all[i]:
                     if k == j:
                         alpha = 1 - (float(1) / N_i)
-                        Sig_alpha_W_i[k] += (alpha * W_i[j])
+                        Sig_alpha_W_i[k] += alpha * W_i[j]
                     else:
                         alpha = 0 - (float(1) / N_i)
-                        Sig_alpha_W_i[k] += (alpha * W_i[j])
-        Sig_alpha_W_i = (1. / self.datanum) * np.transpose(Sig_alpha_W_i)
+                        Sig_alpha_W_i[k] += alpha * W_i[j]
+        Sig_alpha_W_i = (1.0 / self.datanum) * np.transpose(Sig_alpha_W_i)
         return Sig_alpha_W_i
 
     # This function calculates log of our prior
@@ -917,7 +933,7 @@ class DGPLVM_Lamda(Prior, Parameterized):
         x = x.reshape(self.x_shape)
 
         #!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        #self.lamda.values[:] = self.lamda.values/self.lamda.values.sum()
+        # self.lamda.values[:] = self.lamda.values/self.lamda.values.sum()
 
         xprime = x.dot(np.diagflat(self.lamda))
         x = xprime
@@ -928,9 +944,9 @@ class DGPLVM_Lamda(Prior, Parameterized):
         Sb = self.compute_Sb(cls, M_i, M_0)
         Sw = self.compute_Sw(cls, M_i)
         # Sb_inv_N = np.linalg.inv(Sb + np.eye(Sb.shape[0]) * (np.diag(Sb).min() * 0.1))
-        #Sb_inv_N = np.linalg.inv(Sb+np.eye(Sb.shape[0])*0.1)
-        #Sb_inv_N = pdinv(Sb+ np.eye(Sb.shape[0]) * (np.diag(Sb).min() * 0.5))[0]
-        Sb_inv_N = pdinv(Sb + np.eye(Sb.shape[0])*0.9)[0]
+        # Sb_inv_N = np.linalg.inv(Sb+np.eye(Sb.shape[0])*0.1)
+        # Sb_inv_N = pdinv(Sb+ np.eye(Sb.shape[0]) * (np.diag(Sb).min() * 0.5))[0]
+        Sb_inv_N = pdinv(Sb + np.eye(Sb.shape[0]) * 0.9)[0]
         return (-1 / self.sigma2) * np.trace(Sb_inv_N.dot(Sw))
 
     # This function calculates derivative of the log of prior function
@@ -952,19 +968,20 @@ class DGPLVM_Lamda(Prior, Parameterized):
 
         # Calculating inverse of Sb and its transpose and minus
         # Sb_inv_N = np.linalg.inv(Sb + np.eye(Sb.shape[0]) * (np.diag(Sb).min() * 0.1))
-        #Sb_inv_N = np.linalg.inv(Sb+np.eye(Sb.shape[0])*0.1)
-        #Sb_inv_N = pdinv(Sb+ np.eye(Sb.shape[0]) * (np.diag(Sb).min() * 0.5))[0]
-        Sb_inv_N = pdinv(Sb + np.eye(Sb.shape[0])*0.9)[0]
+        # Sb_inv_N = np.linalg.inv(Sb+np.eye(Sb.shape[0])*0.1)
+        # Sb_inv_N = pdinv(Sb+ np.eye(Sb.shape[0]) * (np.diag(Sb).min() * 0.5))[0]
+        Sb_inv_N = pdinv(Sb + np.eye(Sb.shape[0]) * 0.9)[0]
         Sb_inv_N_trans = np.transpose(Sb_inv_N)
         Sb_inv_N_trans_minus = -1 * Sb_inv_N_trans
         Sw_trans = np.transpose(Sw)
 
         # Calculating DJ/DXk
         DJ_Dxk = 2 * (
-            Sb_inv_N_trans_minus.dot(Sw_trans).dot(Sb_inv_N_trans).dot(Sig_beta_B_i_all) + Sb_inv_N_trans.dot(
-                Sig_alpha_W_i))
+            Sb_inv_N_trans_minus.dot(Sw_trans).dot(Sb_inv_N_trans).dot(Sig_beta_B_i_all)
+            + Sb_inv_N_trans.dot(Sig_alpha_W_i)
+        )
         # Calculating derivative of the log of the prior
-        DPx_Dx = ((-1 / self.sigma2) * DJ_Dxk)
+        DPx_Dx = (-1 / self.sigma2) * DJ_Dxk
 
         DPxprim_Dx = np.diagflat(self.lamda).dot(DPx_Dx)
 
@@ -980,7 +997,6 @@ class DGPLVM_Lamda(Prior, Parameterized):
         # print DPxprim_Dx
         return DPxprim_Dx
 
-
     # def frb(self, x):
     #     from functools import partial
     #     from GPy.models import GradientChecker
@@ -995,7 +1011,9 @@ class DGPLVM_Lamda(Prior, Parameterized):
     def __str__(self):
         return 'DGPLVM_prior_Raq_Lamda'
 
+
 # ******************************************
+
 
 class DGPLVM_T(Prior):
     """
@@ -1006,6 +1024,7 @@ class DGPLVM_T(Prior):
     .. Note:: DGPLVM for Classification paper implementation
 
     """
+
     domain = _REAL
     # _instances = []
     # def __new__(cls, mu, sigma): # Singleton:
@@ -1027,7 +1046,6 @@ class DGPLVM_T(Prior):
         self.x_shape = x_shape
         self.dim = x_shape[1]
         self.vec = vec
-
 
     def get_class_label(self, y):
         for idx, v in enumerate(y):
@@ -1075,7 +1093,7 @@ class DGPLVM_T(Prior):
         for i in data_idx:
             if len(lst_idx) == 0:
                 pass
-                #Do nothing, because it is the first time list is created so is empty
+                # Do nothing, because it is the first time list is created so is empty
             else:
                 lst_idx = []
             # Here we put indices of each class in to the list called lst_idx_all
@@ -1100,9 +1118,9 @@ class DGPLVM_T(Prior):
             N_i = float(len(cls[i]))
             W_WT = np.zeros((self.dim, self.dim))
             for xk in cls[i]:
-                W = (xk - M_i[i])
+                W = xk - M_i[i]
                 W_WT += np.outer(W, W)
-            Sw += (N_i / self.datanum) * ((1. / N_i) * W_WT)
+            Sw += (N_i / self.datanum) * ((1.0 / N_i) * W_WT)
         return Sw
 
     # Calculating beta and Bi for Sb
@@ -1127,7 +1145,6 @@ class DGPLVM_T(Prior):
         Sig_beta_B_i_all = Sig_beta_B_i_all.transpose()
         return Sig_beta_B_i_all
 
-
     # Calculating W_j s separately so we can access all the W_j s anytime
     def compute_wj(self, data_idx, M_i):
         W_i = np.zeros((self.datanum, self.dim))
@@ -1136,7 +1153,7 @@ class DGPLVM_T(Prior):
             for tpl in data_idx[i]:
                 xj = tpl[1]
                 j = tpl[0]
-                W_i[j] = (xj - M_i[i])
+                W_i[j] = xj - M_i[i]
         return W_i
 
     # Calculating alpha and Wj for Sw
@@ -1149,11 +1166,11 @@ class DGPLVM_T(Prior):
                 for j in lst_idx_all[i]:
                     if k == j:
                         alpha = 1 - (float(1) / N_i)
-                        Sig_alpha_W_i[k] += (alpha * W_i[j])
+                        Sig_alpha_W_i[k] += alpha * W_i[j]
                     else:
                         alpha = 0 - (float(1) / N_i)
-                        Sig_alpha_W_i[k] += (alpha * W_i[j])
-        Sig_alpha_W_i = (1. / self.datanum) * np.transpose(Sig_alpha_W_i)
+                        Sig_alpha_W_i[k] += alpha * W_i[j]
+        Sig_alpha_W_i = (1.0 / self.datanum) * np.transpose(Sig_alpha_W_i)
         return Sig_alpha_W_i
 
     # This function calculates log of our prior
@@ -1168,10 +1185,10 @@ class DGPLVM_T(Prior):
         Sb = self.compute_Sb(cls, M_i, M_0)
         Sw = self.compute_Sw(cls, M_i)
         # Sb_inv_N = np.linalg.inv(Sb + np.eye(Sb.shape[0]) * (np.diag(Sb).min() * 0.1))
-        #Sb_inv_N = np.linalg.inv(Sb+np.eye(Sb.shape[0])*0.1)
-        #print 'SB_inv: ', Sb_inv_N
-        #Sb_inv_N = pdinv(Sb+ np.eye(Sb.shape[0]) * (np.diag(Sb).min() * 0.1))[0]
-        Sb_inv_N = pdinv(Sb+np.eye(Sb.shape[0])*0.1)[0]
+        # Sb_inv_N = np.linalg.inv(Sb+np.eye(Sb.shape[0])*0.1)
+        # print 'SB_inv: ', Sb_inv_N
+        # Sb_inv_N = pdinv(Sb+ np.eye(Sb.shape[0]) * (np.diag(Sb).min() * 0.1))[0]
+        Sb_inv_N = pdinv(Sb + np.eye(Sb.shape[0]) * 0.1)[0]
         return (-1 / self.sigma2) * np.trace(Sb_inv_N.dot(Sw))
 
     # This function calculates derivative of the log of prior function
@@ -1193,20 +1210,21 @@ class DGPLVM_T(Prior):
 
         # Calculating inverse of Sb and its transpose and minus
         # Sb_inv_N = np.linalg.inv(Sb + np.eye(Sb.shape[0]) * (np.diag(Sb).min() * 0.1))
-        #Sb_inv_N = np.linalg.inv(Sb+np.eye(Sb.shape[0])*0.1)
-        #print 'SB_inv: ',Sb_inv_N
-        #Sb_inv_N = pdinv(Sb+ np.eye(Sb.shape[0]) * (np.diag(Sb).min() * 0.1))[0]
-        Sb_inv_N = pdinv(Sb+np.eye(Sb.shape[0])*0.1)[0]
+        # Sb_inv_N = np.linalg.inv(Sb+np.eye(Sb.shape[0])*0.1)
+        # print 'SB_inv: ',Sb_inv_N
+        # Sb_inv_N = pdinv(Sb+ np.eye(Sb.shape[0]) * (np.diag(Sb).min() * 0.1))[0]
+        Sb_inv_N = pdinv(Sb + np.eye(Sb.shape[0]) * 0.1)[0]
         Sb_inv_N_trans = np.transpose(Sb_inv_N)
         Sb_inv_N_trans_minus = -1 * Sb_inv_N_trans
         Sw_trans = np.transpose(Sw)
 
         # Calculating DJ/DXk
         DJ_Dxk = 2 * (
-            Sb_inv_N_trans_minus.dot(Sw_trans).dot(Sb_inv_N_trans).dot(Sig_beta_B_i_all) + Sb_inv_N_trans.dot(
-                Sig_alpha_W_i))
+            Sb_inv_N_trans_minus.dot(Sw_trans).dot(Sb_inv_N_trans).dot(Sig_beta_B_i_all)
+            + Sb_inv_N_trans.dot(Sig_alpha_W_i)
+        )
         # Calculating derivative of the log of the prior
-        DPx_Dx = ((-1 / self.sigma2) * DJ_Dxk)
+        DPx_Dx = (-1 / self.sigma2) * DJ_Dxk
         return DPx_Dx.T
 
     # def frb(self, x):
@@ -1224,8 +1242,6 @@ class DGPLVM_T(Prior):
         return 'DGPLVM_prior_Raq_TTT'
 
 
-
-
 class HalfT(Prior):
     """
     Implementation of the half student t probability function, coupled with random variables.
@@ -1234,6 +1250,7 @@ class HalfT(Prior):
     :param nu: degrees of freedom
 
     """
+
     domain = _POSITIVE
     _instances = []
 
@@ -1250,13 +1267,20 @@ class HalfT(Prior):
     def __init__(self, A, nu):
         self.A = float(A)
         self.nu = float(nu)
-        self.constant = gammaln(.5*(self.nu+1.)) - gammaln(.5*self.nu) - .5*np.log(np.pi*self.A*self.nu)
+        self.constant = (
+            gammaln(0.5 * (self.nu + 1.0))
+            - gammaln(0.5 * self.nu)
+            - 0.5 * np.log(np.pi * self.A * self.nu)
+        )
 
     def __str__(self):
         return "hT({:.2g}, {:.2g})".format(self.A, self.nu)
 
     def lnpdf(self, theta):
-        return (theta > 0) * (self.constant - .5*(self.nu + 1) * np.log(1. + (1./self.nu) * (theta/self.A)**2))
+        return (theta > 0) * (
+            self.constant
+            - 0.5 * (self.nu + 1) * np.log(1.0 + (1.0 / self.nu) * (theta / self.A) ** 2)
+        )
 
         # theta = theta if isinstance(theta,np.ndarray) else np.array([theta])
         # lnpdfs = np.zeros_like(theta)
@@ -1268,7 +1292,7 @@ class HalfT(Prior):
         # lnpdfs[above_zero] = (+ gammaln((v + 1) * 0.5)
         #     - gammaln(v * 0.5)
         #     - 0.5*np.log(sigma2 * v * np.pi)
-        #     - 0.5*(v + 1)*np.log(1 + (1/np.float(v))*((theta[above_zero][0]**2)/sigma2))
+        #     - 0.5*(v + 1)*np.log(1 + (1/float(v))*((theta[above_zero][0]**2)/sigma2))
         # )
         # return lnpdfs
 
@@ -1278,12 +1302,15 @@ class HalfT(Prior):
         above_zero = theta > 1e-6
         v = self.nu
         sigma2 = self.A
-        grad[above_zero] = -0.5*(v+1)*(2*theta[above_zero])/(v*sigma2 + theta[above_zero][0]**2)
+        grad[above_zero] = (
+            -0.5 * (v + 1) * (2 * theta[above_zero]) / (v * sigma2 + theta[above_zero][0] ** 2)
+        )
         return grad
 
     def rvs(self, n):
         # return np.random.randn(n) * self.sigma + self.mu
         from scipy.stats import t
+
         # [np.abs(x) for x in t.rvs(df=4,loc=0,scale=50, size=10000)])
         ret = t.rvs(self.nu, loc=0, scale=self.A, size=n)
         ret[ret < 0] = 0
@@ -1298,6 +1325,7 @@ class Exponential(Prior):
     :param l: shape parameter
 
     """
+
     domain = _POSITIVE
     _instances = []
 
@@ -1318,21 +1346,24 @@ class Exponential(Prior):
         return "Exp({:.2g})".format(self.l)
 
     def summary(self):
-        ret = {"E[x]": 1. / self.l,
-               "E[ln x]": np.nan,
-               "var[x]": 1. / self.l**2,
-               "Entropy": 1. - np.log(self.l),
-               "Mode": 0.}
+        ret = {
+            "E[x]": 1.0 / self.l,
+            "E[ln x]": np.nan,
+            "var[x]": 1.0 / self.l**2,
+            "Entropy": 1.0 - np.log(self.l),
+            "Mode": 0.0,
+        }
         return ret
 
     def lnpdf(self, x):
         return np.log(self.l) - self.l * x
 
     def lnpdf_grad(self, x):
-        return - self.l
+        return -self.l
 
     def rvs(self, n):
         return np.random.exponential(scale=self.l, size=n)
+
 
 class StudentT(Prior):
     """
@@ -1345,6 +1376,7 @@ class StudentT(Prior):
     .. Note:: Bishop 2006 notation is used throughout the code
 
     """
+
     domain = _REAL
     _instances = []
 
@@ -1373,13 +1405,14 @@ class StudentT(Prior):
 
     def lnpdf(self, x):
         from scipy.stats import t
-        return t.logpdf(x,self.nu,self.mu,self.sigma)
+
+        return t.logpdf(x, self.nu, self.mu, self.sigma)
 
     def lnpdf_grad(self, x):
-        return -(self.nu + 1.)*(x - self.mu)/( self.nu*self.sigma2 + np.square(x - self.mu) )
+        return -(self.nu + 1.0) * (x - self.mu) / (self.nu * self.sigma2 + np.square(x - self.mu))
 
     def rvs(self, n):
         from scipy.stats import t
+
         ret = t.rvs(self.nu, loc=self.mu, scale=self.sigma, size=n)
         return ret
-
