@@ -1,4 +1,4 @@
-#===============================================================================
+# ===============================================================================
 # Copyright (c) 2012-2015, GPy authors (see AUTHORS.txt).
 # All rights reserved.
 #
@@ -26,12 +26,13 @@
 # CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#===============================================================================
+# ===============================================================================
 
 import numpy as np
 from scipy import sparse
 import itertools
 from ...models import WarpedGP
+
 
 def in_ipynb():
     try:
@@ -40,17 +41,21 @@ def in_ipynb():
     except NameError:
         return False
 
+
 def find_best_layout_for_subplots(num_subplots):
     r, c = 1, 1
-    while (r*c) < num_subplots:
-        if (c==(r+1)) or (r==c):
+    while (r * c) < num_subplots:
+        if (c == (r + 1)) or (r == c):
             c += 1
-        elif c==(r+2):
+        elif c == (r + 2):
             r += 1
             c -= 1
     return r, c
 
-def helper_predict_with_model(self, Xgrid, plot_raw, apply_link, percentiles, which_data_ycols, predict_kw, samples=0):
+
+def helper_predict_with_model(
+    self, Xgrid, plot_raw, apply_link, percentiles, which_data_ycols, predict_kw, samples=0
+):
     """
     Make the right decisions for prediction with a model
     based on the standard arguments of plotting.
@@ -65,20 +70,22 @@ def helper_predict_with_model(self, Xgrid, plot_raw, apply_link, percentiles, wh
         if plot_raw:
             from ...likelihoods import Gaussian
             from ...likelihoods.link_functions import Identity
-            lik = Gaussian(Identity(), 1e-9) # Make the likelihood not add any noise
+
+            lik = Gaussian(Identity(), 1e-9)  # Make the likelihood not add any noise
         else:
             lik = None
         predict_kw['likelihood'] = lik
     if 'Y_metadata' not in predict_kw:
         predict_kw['Y_metadata'] = {}
     if 'output_index' not in predict_kw['Y_metadata']:
-        predict_kw['Y_metadata']['output_index'] = Xgrid[:,-1:].astype(np.int)
+        predict_kw['Y_metadata']['output_index'] = Xgrid[:, -1:].astype(int)
 
     mu, _ = self.predict(Xgrid, **predict_kw)
 
     if percentiles is not None:
         percentiles = self.predict_quantiles(Xgrid, quantiles=percentiles, **predict_kw)
-    else: percentiles = []
+    else:
+        percentiles = []
 
     if samples > 0:
         fsamples = self.posterior_samples(Xgrid, size=samples, **predict_kw)
@@ -100,6 +107,7 @@ def helper_predict_with_model(self, Xgrid, plot_raw, apply_link, percentiles, wh
                     fsamples[:, i, s] = self.likelihood.gp_link.transf(fsamples[:, i, s])
     return retmu, percs, fsamples
 
+
 def helper_for_plot_data(self, X, plot_limits, visible_dims, fixed_inputs, resolution):
     """
     Figure out the data, free_dims and create an Xgrid for
@@ -107,35 +115,42 @@ def helper_for_plot_data(self, X, plot_limits, visible_dims, fixed_inputs, resol
 
     This is only implemented for two dimensions for now!
     """
-    #work out what the inputs are for plotting (1D or 2D)
+    # work out what the inputs are for plotting (1D or 2D)
     if fixed_inputs is None:
         fixed_inputs = []
     fixed_dims = get_fixed_dims(fixed_inputs)
     free_dims = get_free_dims(self, visible_dims, fixed_dims)
 
     if len(free_dims) == 1:
-        #define the frame on which to plot
+        # define the frame on which to plot
         resolution = resolution or 200
-        Xnew, xmin, xmax = x_frame1D(X[:,free_dims], plot_limits=plot_limits, resolution=resolution)
-        Xgrid = np.zeros((Xnew.shape[0],self.input_dim))
-        Xgrid[:,free_dims] = Xnew
-        for i,v in fixed_inputs:
-            Xgrid[:,i] = v
+        Xnew, xmin, xmax = x_frame1D(
+            X[:, free_dims], plot_limits=plot_limits, resolution=resolution
+        )
+        Xgrid = np.zeros((Xnew.shape[0], self.input_dim))
+        Xgrid[:, free_dims] = Xnew
+        for i, v in fixed_inputs:
+            Xgrid[:, i] = v
         x = Xgrid
         y = None
     elif len(free_dims) == 2:
-        #define the frame for plotting on
+        # define the frame for plotting on
         resolution = resolution or 35
-        Xnew, x, y, xmin, xmax = x_frame2D(X[:,free_dims], plot_limits, resolution)
+        Xnew, x, y, xmin, xmax = x_frame2D(X[:, free_dims], plot_limits, resolution)
         Xgrid = np.zeros((Xnew.shape[0], self.input_dim))
-        Xgrid[:,free_dims] = Xnew
-        #xmin = Xgrid.min(0)[free_dims]
-        #xmax = Xgrid.max(0)[free_dims]
-        for i,v in fixed_inputs:
-            Xgrid[:,i] = v
+        Xgrid[:, free_dims] = Xnew
+        # xmin = Xgrid.min(0)[free_dims]
+        # xmax = Xgrid.max(0)[free_dims]
+        for i, v in fixed_inputs:
+            Xgrid[:, i] = v
     else:
-        raise TypeError("calculated free_dims {} from visible_dims {} and fixed_dims {} is neither 1D nor 2D".format(free_dims, visible_dims, fixed_dims))
+        raise TypeError(
+            "calculated free_dims {} from visible_dims {} and fixed_dims {} is neither 1D nor 2D".format(
+                free_dims, visible_dims, fixed_dims
+            )
+        )
     return fixed_dims, free_dims, Xgrid, x, y, xmin, xmax, resolution
+
 
 def scatter_label_generator(labels, X, visible_dims, marker=None):
     ulabels = []
@@ -160,11 +175,12 @@ def scatter_label_generator(labels, X, visible_dims, marker=None):
 
     for ul in ulabels:
         from numbers import Number
+
         if isinstance(ul, str):
             try:
                 this_label = unicode(ul)
             except NameError:
-                #python3
+                # python3
                 this_label = ul
         elif isinstance(ul, Number):
             this_label = 'class {!s}'.format(ul)
@@ -191,6 +207,7 @@ def scatter_label_generator(labels, X, visible_dims, marker=None):
 
         yield x, y, z, this_label, index, m
 
+
 def subsample_X(X, labels, num_samples=1000):
     """
     Stratified subsampling if labels are given.
@@ -198,17 +215,27 @@ def subsample_X(X, labels, num_samples=1000):
     num_samples and the returned subsampled X.
     """
     if X.shape[0] > num_samples:
-        print("Warning: subsampling X, as it has more samples then {}. X.shape={!s}".format(int(num_samples), X.shape))
+        print(
+            "Warning: subsampling X, as it has more samples then {}. X.shape={!s}".format(
+                int(num_samples), X.shape
+            )
+        )
         if labels is not None:
             subsample = []
             for _, _, _, _, index, _ in scatter_label_generator(labels, X, (0, None, None)):
-                subsample.append(np.random.choice(index, size=max(2, int(index.size*(float(num_samples)/X.shape[0]))), replace=False))
+                subsample.append(
+                    np.random.choice(
+                        index,
+                        size=max(2, int(index.size * (float(num_samples) / X.shape[0]))),
+                        replace=False,
+                    )
+                )
             subsample = np.hstack(subsample)
         else:
             subsample = np.random.choice(X.shape[0], size=1000, replace=False)
         X = X[subsample]
         labels = labels[subsample]
-        #=======================================================================
+        # =======================================================================
         #     <<<WORK IN PROGRESS>>>
         #     <<<DO NOT DELETE>>>
         #     plt.close('all')
@@ -252,7 +279,7 @@ def subsample_X(X, labels, num_samples=1000):
         #     plt.legend(legend_handles, [l.get_label() for l in legend_handles])
         #     plt.draw()
         #     plt.show()
-        #=======================================================================
+        # =======================================================================
     return X, labels
 
 
@@ -265,8 +292,9 @@ def update_not_existing_kwargs(to_update, update_from):
     """
     if to_update is None:
         to_update = {}
-    to_update.update({k:v for k,v in update_from.items() if k not in to_update})
+    to_update.update({k: v for k, v in update_from.items() if k not in to_update})
     return to_update
+
 
 def get_x_y_var(model):
     """
@@ -296,9 +324,11 @@ def get_x_y_var(model):
 
     if isinstance(model, WarpedGP) and not model.predict_in_warped_space:
         Y = model.Y_normalized
-    
-    if sparse.issparse(Y): Y = Y.todense().view(np.ndarray)
+
+    if sparse.issparse(Y):
+        Y = Y.todense().view(np.ndarray)
     return X, X_variance, Y
+
 
 def get_free_dims(model, visible_dims, fixed_dims):
     """
@@ -321,7 +351,8 @@ def get_fixed_dims(fixed_inputs):
     """
     Work out the fixed dimensions from the fixed_inputs list of tuples.
     """
-    return np.array([i for i,_ in fixed_inputs])
+    return np.array([i for i, _ in fixed_inputs])
+
 
 def get_which_data_ycols(model, which_data_ycols):
     """
@@ -331,6 +362,7 @@ def get_which_data_ycols(model, which_data_ycols):
         return np.arange(model.output_dim)
     return which_data_ycols
 
+
 def get_which_data_rows(model, which_data_rows):
     """
     Helper to get the data rows to plot.
@@ -339,34 +371,37 @@ def get_which_data_rows(model, which_data_rows):
         return slice(None)
     return which_data_rows
 
-def x_frame1D(X,plot_limits=None,resolution=None):
+
+def x_frame1D(X, plot_limits=None, resolution=None):
     """
     Internal helper function for making plots, returns a set of input values to plot as well as lower and upper limits
     """
-    assert X.shape[1] ==1, "x_frame1D is defined for one-dimensional inputs"
+    assert X.shape[1] == 1, "x_frame1D is defined for one-dimensional inputs"
     if plot_limits is None:
         from GPy.core.parameterization.variational import VariationalPosterior
+
         if isinstance(X, VariationalPosterior):
-            xmin,xmax = X.mean.min(0),X.mean.max(0)
+            xmin, xmax = X.mean.min(0), X.mean.max(0)
         else:
-            xmin,xmax = X.min(0),X.max(0)
-        xmin, xmax = xmin-0.25*(xmax-xmin), xmax+0.25*(xmax-xmin)
+            xmin, xmax = X.min(0), X.max(0)
+        xmin, xmax = xmin - 0.25 * (xmax - xmin), xmax + 0.25 * (xmax - xmin)
     elif len(plot_limits) == 2:
         xmin, xmax = map(np.atleast_1d, plot_limits)
     else:
         raise ValueError("Bad limits for plotting")
 
-    Xnew = np.linspace(float(xmin),float(xmax),int(resolution) or 200)[:,None]
+    Xnew = np.linspace(float(xmin), float(xmax), int(resolution) or 200)[:, None]
     return Xnew, xmin, xmax
 
-def x_frame2D(X,plot_limits=None,resolution=None):
+
+def x_frame2D(X, plot_limits=None, resolution=None):
     """
     Internal helper function for making plots, returns a set of input values to plot as well as lower and upper limits
     """
-    assert X.shape[1]==2, "x_frame2D is defined for two-dimensional inputs"
+    assert X.shape[1] == 2, "x_frame2D is defined for two-dimensional inputs"
     if plot_limits is None:
         xmin, xmax = X.min(0), X.max(0)
-        xmin, xmax = xmin-0.075*(xmax-xmin), xmax+0.075*(xmax-xmin)
+        xmin, xmax = xmin - 0.075 * (xmax - xmin), xmax + 0.075 * (xmax - xmin)
     elif len(plot_limits) == 2:
         xmin, xmax = plot_limits
         try:
@@ -381,6 +416,6 @@ def x_frame2D(X,plot_limits=None,resolution=None):
         raise ValueError("Bad limits for plotting")
 
     resolution = resolution or 50
-    xx, yy = np.mgrid[xmin[0]:xmax[0]:1j*resolution,xmin[1]:xmax[1]:1j*resolution]
+    xx, yy = np.mgrid[xmin[0] : xmax[0] : 1j * resolution, xmin[1] : xmax[1] : 1j * resolution]
     Xnew = np.c_[xx.flat, yy.flat]
     return Xnew, xx, yy, xmin, xmax
